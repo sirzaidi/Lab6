@@ -2,7 +2,7 @@ name: SonarQube Analysis
 
 on:
   push:
-    branches: [main, dev, production] # Add your main branch here
+    branches: [main, dev, production] # Add your main branch hereS
   pull_request:
     branches: [production, dev, test]
     types: [opened, synchronize, reopened]
