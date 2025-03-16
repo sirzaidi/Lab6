@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -23,43 +22,30 @@ db = SQLAlchemy(app)
 
 # Models
 # Add new model for course enrollment
-
-
 class Enrollment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(
-        db.Integer, db.ForeignKey('user.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey(
-        'course.id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
     enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     # Vulnerability: No unique constraint on student_id and course_id
-
 
 class Grade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    submission_id = db.Column(db.Integer, db.ForeignKey(
-        'submission.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey(
-        'course.id'), nullable=False)  # Add this
+    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)  # Add this
     value = db.Column(db.Integer, nullable=False)
     feedback = db.Column(db.Text)
     graded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Update submission model to ensure course relationship
-
-
 class Submission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(
-        db.Integer, db.ForeignKey('user.id'), nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey(
-        'course.id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
     grade = db.Column(db.Integer)
     feedback = db.Column(db.Text)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     grades = db.relationship('Grade', backref='submission', lazy=True)
-
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,23 +54,18 @@ class User(db.Model):
     password = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(20), nullable=False)  # 'student' or 'teacher'
 
-
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)  # Vulnerability: Stored XSS
-    teacher_id = db.Column(
-        db.Integer, db.ForeignKey('user.id'), nullable=False)
-
+    teacher_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 class Assignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
-    course_id = db.Column(db.Integer, db.ForeignKey(
-        'course.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
     due_date = db.Column(db.DateTime, nullable=False)
-
 
 def is_course_teacher(course_id: int, teacher_id: int) -> bool:
     """
@@ -97,24 +78,17 @@ def is_course_teacher(course_id: int, teacher_id: int) -> bool:
     Returns:
         bool: True if the teacher owns the course, False otherwise
     """
-    course = Course.query.filter_by(
-        id=course_id, teacher_id=teacher_id).first()
+    course = Course.query.filter_by(id=course_id, teacher_id=teacher_id).first()
     return course is not None
 
 # New routes for enhanced functionality
-
-
 @app.route('/', methods=['GET'])
 def first():
-
     return jsonify({'message': 'Backend flask app running'}), 200
-
 
 @app.route('/api', methods=['GET'])
 def api_route():
-
     return jsonify({'message': '/API endpoint called !'}), 200
-
 
 @app.route('/api/grade-submission', methods=['POST'])
 def grade_submission():
@@ -136,7 +110,6 @@ def grade_submission():
 
     return jsonify({'message': 'Submission not found'}), 404
 
-
 @app.route('/api/student-submissions/<int:student_id>', methods=['GET'])
 def get_student_submissions(student_id):
     # Vulnerability: IDOR possible - no authentication check
@@ -152,7 +125,6 @@ def get_student_submissions(student_id):
         } if sub.grade else None
     } for sub in submissions])
 
-
 @app.route('/api/courses/<int:course_id>/assignments', methods=['GET'])
 def get_course_assignments(course_id):
     # Vulnerability: No authentication check
@@ -167,8 +139,6 @@ def get_course_assignments(course_id):
 
 # Vulnerability: No input validation or sanitization
 # Modified registration endpoint with role-based signup
-
-
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -190,16 +160,13 @@ def register():
     return jsonify({'message': 'Registration successful'})
 
 # New endpoint for course creation (teachers only)
-
-
 @app.route('/api/courses', methods=['POST'])
 def create_course():
     token = request.headers.get('Authorization', '').split('Bearer ')[-1]
     data = request.get_json()
 
     try:
-        payload = jwt.decode(
-            token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         user = User.query.filter_by(id=payload['user_id']).first()
 
         if not user or user.role != 'teacher':
@@ -227,7 +194,6 @@ def create_course():
     except jwt.InvalidTokenError:
         return jsonify({'message': 'Invalid token'}), 401
 
-
 @app.route('/api/enroll', methods=['POST'])
 def enroll_in_course():
     data = request.get_json()
@@ -235,8 +201,7 @@ def enroll_in_course():
 
     try:
         # Vulnerability: No token expiration check
-        payload = jwt.decode(
-            token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         user = User.query.get(payload['user_id'])
 
         if not user or user.role != 'student':
@@ -257,15 +222,12 @@ def enroll_in_course():
         return jsonify({'message': 'Invalid token'}), 401
 
 # Modified get_courses endpoint to include enrollment status for students
-
-
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
     token = request.headers.get('Authorization', '').split('Bearer ')[-1]
 
     try:
-        payload = jwt.decode(
-            token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         user = User.query.filter_by(id=payload['user_id']).first()
 
         if not user:
@@ -288,8 +250,7 @@ def get_courses():
             enrolled_course_ids = [e.course_id for e in enrollments]
 
             # Get all teachers at once to avoid N+1 query problem
-            teachers = {u.id: u.username for u in User.query.filter_by(
-                role='teacher').all()}
+            teachers = {u.id: u.username for u in User.query.filter_by(role='teacher').all()}
 
             return jsonify([{
                 'id': c.id,
@@ -302,7 +263,6 @@ def get_courses():
 
     except jwt.InvalidTokenError:
         return jsonify({'message': 'Invalid token'}), 401
-
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -328,9 +288,8 @@ def login():
         return jsonify({'token': token})
 
     return jsonify({'message': 'Invalid credentials'}), 401
+
 # Vulnerability: No proper authentication check
-
-
 @app.route('/api/submissions/<int:submission_id>', methods=['GET'])
 def get_submission(submission_id):
     # Vulnerability: No authorization check
@@ -346,8 +305,6 @@ def get_submission(submission_id):
     })
 
 # Vulnerability: Insecure file handling
-
-
 @app.route('/api/submit-assignment', methods=['POST'])
 def submit_assignment():
     if 'file' not in request.files:
@@ -373,19 +330,15 @@ def submit_assignment():
     return jsonify({'message': 'Assignment submitted successfully'})
 
 # Vulnerability: Directory traversal possible
-
-
 @app.route('/api/download/<path:filename>', methods=['GET'])
 def download_file(filename):
     # Vulnerability: No authorization check
     # Vulnerability: No path validation
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-
 # Vulnerability: Command injection possible
 with app.app_context():
     db.create_all()
-
 
 @app.route('/api/export-grades', methods=['POST'])
 def export_grades():
@@ -397,14 +350,12 @@ def export_grades():
 
     return jsonify({'message': 'Export completed'})
 
-
 @app.route('/api/courses/<int:course_id>/students', methods=['GET'])
 def get_course_students(course_id):
     token = request.headers.get('Authorization', '').split('Bearer ')[-1]
 
     try:
-        payload = jwt.decode(
-            token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         user = User.query.filter_by(id=payload['user_id']).first()
 
         if not user or user.role != 'teacher':
@@ -445,14 +396,12 @@ def get_course_students(course_id):
     except jwt.InvalidTokenError:
         return jsonify({'message': 'Invalid token'}), 401
 
-
 @app.route('/api/courses/<int:course_id>/student-grades/<int:student_id>', methods=['GET'])
 def get_student_course_grades(course_id, student_id):
     token = request.headers.get('Authorization', '').split('Bearer ')[-1]
 
     try:
-        payload = jwt.decode(
-            token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         user = User.query.filter_by(id=payload['user_id']).first()
 
         # Check authorization
@@ -478,16 +427,13 @@ def get_student_course_grades(course_id, student_id):
         return jsonify({'message': 'Invalid token'}), 401
 
 # Update the grade submission endpoint
-
-
 @app.route('/api/grade/student', methods=['POST'])
 def grade_student():
     token = request.headers.get('Authorization', '').split('Bearer ')[-1]
     data = request.get_json()
 
     try:
-        payload = jwt.decode(
-            token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         user = User.query.filter_by(id=payload['user_id']).first()
 
         if not user or user.role != 'teacher':
@@ -532,6 +478,29 @@ def grade_student():
         print(f"Error submitting grade: {str(e)}")
         return jsonify({'message': 'Error submitting grade'}), 500
 
+
+# -----------------------------
+# NEW VULNERABILITY ADDED BELOW
+# -----------------------------
+@app.route('/api/insecure-delete-user', methods=['GET'])
+def insecure_delete_user():
+    """
+    Example of a new unique vulnerability:
+    SQL injection via direct string concatenation
+    This route allows deletion of users based on GET parameter 'username'.
+    """
+    username = request.args.get('username', '')
+
+    # Directly constructing the query from user input => vulnerable
+    conn = sqlite3.connect('learning.db')
+    cursor = conn.cursor()
+    query = f"DELETE FROM user WHERE username = '{username}'"
+    cursor.execute(query)  # Vulnerability: SQL injection
+    conn.commit()
+    conn.close()
+
+    return jsonify({'message': f"User '{username}' has been deleted (insecurely)."}), 200
+# -----------------------------
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
